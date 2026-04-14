@@ -257,8 +257,7 @@ itemsList.addEventListener("click", (event) => {
       }
       break;
     case "delete":
-      config.items["}
-      .filter((candidate) => candidate.id !== item.id);
+      config.items = config.items.filter((candidate) => candidate.id !== item.id);
       config.roundExcludedIds = config.roundExcludedIds.filter((id) => id !== item.id);
       persist("项目已删除。");
       renderAll();
