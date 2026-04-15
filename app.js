@@ -19,11 +19,13 @@ const resultModalText = document.querySelector("#resultModalText");
 const resultModalClose = document.querySelector("#resultModalClose");
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const SPIN_ACCELERATION_RATIO = 0.2;
 
 let config = loadConfig();
 let currentSegments = [];
 let currentRotation = 0;
 let spinTimer = null;
+let spinFrameId = null;
 let isSpinning = false;
 let lastAnnouncement = "";
 let displayedWheelSignature = "";
@@ -52,6 +54,10 @@ function createWheelSignature(items) {
 
 function stopWheelMotion() {
   window.clearTimeout(spinTimer);
+  if (spinFrameId !== null) {
+    window.cancelAnimationFrame(spinFrameId);
+    spinFrameId = null;
+  }
   if (typeof wheelRotor.getAnimations === "function") {
     wheelRotor.getAnimations().forEach((animation) => animation.cancel());
   }
@@ -176,61 +182,49 @@ function ensureWheelMatchesCurrentPool(options = {}) {
 
 function animateSpin(fromRotation, toRotation, duration) {
   stopWheelMotion();
-
-  if (typeof wheelRotor.animate === "function" && !prefersReducedMotion.matches) {
-    const distance = toRotation - fromRotation;
-    const animation = wheelRotor.animate(
-      [
-        { transform: `rotate(${fromRotation}deg)`, offset: 0 },
-        {
-          transform: `rotate(${(fromRotation + distance * 0.05).toFixed(3)}deg)`,
-          offset: 0.06,
-          easing: "cubic-bezier(0.18, 0.92, 0.32, 1)"
-        },
-        {
-          transform: `rotate(${(fromRotation + distance * 0.78).toFixed(3)}deg)`,
-          offset: 0.58,
-          easing: "cubic-bezier(0.08, 0.9, 0.18, 1)"
-        },
-        {
-          transform: `rotate(${(fromRotation + distance * 0.93).toFixed(3)}deg)`,
-          offset: 0.82,
-          easing: "cubic-bezier(0.16, 0.36, 0.18, 1)"
-        },
-        {
-          transform: `rotate(${(fromRotation + distance * 0.985).toFixed(3)}deg)`,
-          offset: 0.95,
-          easing: "cubic-bezier(0.18, 0.08, 0.22, 1)"
-        },
-        { transform: `rotate(${toRotation}deg)`, offset: 1 }
-      ],
-      {
-        duration,
-        easing: "linear",
-        fill: "forwards"
-      }
-    );
-
-    return animation.finished
-      .catch(() => undefined)
-      .then(() => {
-        animation.cancel();
-        stopWheelMotion();
-        applyWheelRotation(toRotation);
-      });
+  if (prefersReducedMotion.matches) {
+    applyWheelRotation(toRotation);
+    return Promise.resolve();
   }
 
   return new Promise((resolve) => {
-    wheelRotor.style.transition = `transform ${duration}ms cubic-bezier(0.08, 0.9, 0.14, 1)`;
-    requestAnimationFrame(() => {
-      applyWheelRotation(toRotation);
-    });
+    const totalDistance = toRotation - fromRotation;
+    const safeDuration = Math.max(120, duration);
+    const accelerationDuration = Math.max(120, safeDuration * SPIN_ACCELERATION_RATIO);
+    const decelerationDuration = Math.max(120, safeDuration - accelerationDuration);
+    const acceleration = (2 * totalDistance) / (accelerationDuration * safeDuration);
+    const peakVelocity = acceleration * accelerationDuration;
+    const deceleration = peakVelocity / decelerationDuration;
+    const accelerationDistance = 0.5 * acceleration * accelerationDuration * accelerationDuration;
+    const startTime = performance.now();
 
-    spinTimer = window.setTimeout(() => {
-      stopWheelMotion();
-      applyWheelRotation(toRotation);
-      resolve();
-    }, duration + 60);
+    function step(now) {
+      const elapsed = Math.min(now - startTime, safeDuration);
+      let travelledDistance = 0;
+
+      if (elapsed <= accelerationDuration) {
+        travelledDistance = 0.5 * acceleration * elapsed * elapsed;
+      } else {
+        const decelerationElapsed = elapsed - accelerationDuration;
+        travelledDistance =
+          accelerationDistance +
+          peakVelocity * decelerationElapsed -
+          0.5 * deceleration * decelerationElapsed * decelerationElapsed;
+      }
+
+      applyWheelRotation(fromRotation + travelledDistance);
+
+      if (elapsed >= safeDuration) {
+        stopWheelMotion();
+        applyWheelRotation(toRotation);
+        resolve();
+        return;
+      }
+
+      spinFrameId = window.requestAnimationFrame(step);
+    }
+
+    spinFrameId = window.requestAnimationFrame(step);
   });
 }
 
