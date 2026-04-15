@@ -30,10 +30,14 @@ let displayedWheelSignature = "";
 
 function escapeMarkup(value) {
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+    .split("&")
+    .join("&amp;")
+    .split("<")
+    .join("&lt;")
+    .split(">")
+    .join("&gt;")
+    .split('"')
+    .join("&quot;");
 }
 
 function normalizeDegrees(angle) {
@@ -48,7 +52,9 @@ function createWheelSignature(items) {
 
 function stopWheelMotion() {
   window.clearTimeout(spinTimer);
-  wheelRotor.getAnimations?.().forEach((animation) => animation.cancel());
+  if (typeof wheelRotor.getAnimations === "function") {
+    wheelRotor.getAnimations().forEach((animation) => animation.cancel());
+  }
   wheelRotor.style.transition = "none";
 }
 
@@ -66,7 +72,7 @@ function setStatus(message, tone = "") {
 }
 
 function setLatestResult() {
-  latestResult.textContent = config.resultHistory[0] ?? "还没有抽取结果";
+  latestResult.textContent = config.resultHistory.length ? config.resultHistory[0] : "还没有抽取结果";
 }
 
 function closeResultModal() {
@@ -372,12 +378,17 @@ function resetRound() {
 
 spinButton.addEventListener("click", handleSpin);
 resetRoundButton.addEventListener("click", resetRound);
-resultModalClose?.addEventListener("click", closeResultModal);
-resultModal?.addEventListener("click", (event) => {
-  if (event.target === resultModal) {
-    closeResultModal();
-  }
-});
+if (resultModalClose) {
+  resultModalClose.addEventListener("click", closeResultModal);
+}
+
+if (resultModal) {
+  resultModal.addEventListener("click", (event) => {
+    if (event.target === resultModal) {
+      closeResultModal();
+    }
+  });
+}
 
 for (const button of modeButtons) {
   button.addEventListener("click", () => {

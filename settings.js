@@ -24,7 +24,7 @@ const modeButtons = [...document.querySelectorAll(".segment-button[data-mode]")]
 let config = loadConfig();
 
 function escapeAttribute(value) {
-  return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+  return String(value).split("&").join("&amp;").split('"').join("&quot;").split("<").join("&lt;");
 }
 
 function setToolsStatus(message, tone = "") {
@@ -192,7 +192,7 @@ importButton.addEventListener("click", () => {
 });
 
 importInput.addEventListener("change", () => {
-  const file = importInput.files?.[0];
+  const file = importInput.files && importInput.files.length ? importInput.files[0] : null;
   if (file) {
     importConfigFile(file);
   }

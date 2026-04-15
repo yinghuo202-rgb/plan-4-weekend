@@ -7,10 +7,14 @@
 
   function escapeMarkup(value) {
     return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
+      .split("&")
+      .join("&amp;")
+      .split("<")
+      .join("&lt;")
+      .split(">")
+      .join("&gt;")
+      .split('"')
+      .join("&quot;");
   }
 
   function polarToCartesian(radius, angleDegrees) {
@@ -243,7 +247,7 @@
       }
     }
 
-    return segments.at(-1) ?? null;
+    return segments.length ? segments[segments.length - 1] : null;
   }
 
   function calculateSpinRotation(currentRotation, segment) {
